@@ -1,7 +1,7 @@
 # Tokenizer
-Tokenizer + Visualizer for it 
+Simple Tokenizer built for learning purposes
 
-Leetcode Problems Encountered While working on this: 1
+Leetcode Problems Encountered While working on this: 1 
 - Top K Frequent Elements 
 
 ```bash
