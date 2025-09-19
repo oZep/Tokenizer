@@ -1,11 +1,17 @@
 class Tokenizer:
     def __init__(self):
         self.idx = 256 # start assigning new token ids after the byte range
-        self.vocab_size = 512 # limit vocab size to avoid excessive growth
+        self.vocab_size = 276 # limit vocab size to avoid excessive growth
         self.token_copy = []
+        self.text = ""
+        self.ids = []
+        self.merges = {}
+
+    ####################################  TRAINING generating self.merges ##############################################
 
     def tokenize(self, text):
         token = text.encode('utf-8') # raw bytes
+        self.text = text
         self.token_copy = list(map(int, token))
         return self.compress_all(self.token_copy)
 
@@ -50,9 +56,51 @@ class Tokenizer:
             byte_array = self.merge(byte_array, pair, idx)
             merges[pair] = idx
 
+        self.ids = byte_array
+        self.merges = merges
         return byte_array, merges
+    
+    def get_compression_info(self):
+        print("Original size (in bytes):", len(self.token_copy))
+        print("Compressed size (in tokens):", len(self.ids))
+        print(f"Compression ratio: {len(self.token_copy) / len(self.ids) if len(self.ids) > 0 else 0:.2f}X")
+    
+    
+    ########################################################  Using self.merges as a dictionary ###############################################################
+
+    def decode(self, ids):
+        '''
+        given ids (list of integers), return string
+        '''
+        def vocab():
+            vocab = {self.idx: bytes([self.idx]) for self.idx in range(256)}
+            for (p0, p1), idx in self.merges.items():
+                vocab[idx] = vocab[p0] + vocab[p1]
+            return vocab
+        
+        vocab_map = vocab()
+        tokens = b"".join(vocab_map[idx] for idx in ids)
+        text = tokens.decode('utf-8', errors='replace') # replace invalid bytes (like 128)
+        return text
+    
+    def encode(self, text):
+        token = list(text.encode('utf-8')) # raw bytes
+
+        while len(token) >= 2:
+            stats = self.get_stats(token)
+            pair = min(stats, key=lambda pair: self.merges.get(pair, float('inf')))
+            if pair not in self.merges: # nothing to merge
+                break
+            idx = self.merges[pair] # lookup merge index
+            token = self.merge(token, pair, idx)
+        return token
 
 
 if __name__ == "__main__":
     token_it = Tokenizer()
     token_it.tokenize(f"You’ll unpack this definition throughout the rest of the tutorial.As you work through the code examples, you’ll see that Python zip operations work just like the physical zipper on a bag or pair of jeans. Interlocking pairs of teeth on both sides of the zipper are pulled together to close an opening. In fact, this visual analogy is perfect for understanding zip(), since the function was named after physical zippers!")
+    token_it.get_compression_info()
+
+    x  = token_it.encode("HI my name is joey and i really want to see what this is all about!")
+    print(x)
+    print(token_it.decode(x))
